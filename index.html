@@ -201,7 +201,7 @@ function listScreen(S, last, has, name) {
   var cw = (CW - 32) / 3;
   [["Figures left to handle", String(left), "of 4 flagged before release", left ? C.red : C.green],
    ["Handled", String(S.length), follow ? follow + " needs follow-up next period" : "Checked, corrected or set to follow-up", C.ink],
-   ["Employees in this run", "48", "Sample data", C.ink]].forEach(function (k, i) {
+   ["Employees in this run", "48", C.ink]].forEach(function (k, i) {
     var x = CX + i * (cw + 16);
     s.card(x, y, cw, 108);
     s.text(x + 20, y + 18, k[0], { s: 13, c: C.ink2 });
