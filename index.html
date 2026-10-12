@@ -552,7 +552,11 @@ function buildSpec(mode) {
 // Clickable HTML preview: renders each state on demand from the shared spec.
 (function () {
   var screens = buildSpec("full").filter(function (sc) { return sc.id !== "overview"; }), spec = {}, built = {}, stack = [], cur = null, notesOn = false;
-  screens.forEach(function (sc) { spec[sc.id] = sc; });
+  var HIDE = ["Every figure is traced the same way: 1 Records, 2 Rule, 3 Result."];
+  screens.forEach(function (sc) {
+    sc.els = sc.els.filter(function (e) { return !(e.k === "text" && HIDE.indexOf(e.v) >= 0); });
+    spec[sc.id] = sc;
+  });
   var root = document.getElementById("stage"), label = document.getElementById("label"), panel = document.getElementById("notes");
   function wt(w) { return { "Regular": 400, "Medium": 500, "Semi Bold": 600, "Bold": 700 }[w]; }
   function el(tag, cls) { var d = document.createElement(tag); if (cls) d.className = cls; return d; }
