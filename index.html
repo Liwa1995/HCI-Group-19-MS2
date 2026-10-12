@@ -1,26 +1,36 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MotorPH pre-payroll check, interactive wireframe</title>
+<title>MotorPH pre-payroll check, interactive wireframe v2</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
 body{margin:0;background:#cfd4d5;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
-#tabs{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px;background:#1E2A2B}
-#tabs button{font:500 12px Inter,system-ui,sans-serif;border:0;border-radius:4px;padding:6px 10px;background:#33403f;color:#dfe5e5;cursor:pointer}
-#tabs button.on{background:#E3EEEE;color:#16494A}
+#bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:#1E2A2B}
+#bar button{font:500 13px Inter,system-ui,sans-serif;border:0;border-radius:4px;padding:7px 12px;background:#33403f;color:#e6ecec;cursor:pointer}
+#bar button[aria-pressed=true]{background:#EFEAF7;color:#4b3a78}
+#label{color:#cfd8d8;font-size:13px;margin-left:8px}
 #wrap{padding:16px;overflow:hidden}
 #stage{transform-origin:0 0;width:1440px}
 .frame{position:relative;overflow:hidden;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.15)}
 .el{position:absolute;box-sizing:border-box;margin:0;border:0;font-family:inherit}
+.tri{width:0;height:0;border-style:solid}
 button.el{cursor:default;display:block}
 button.el.link{cursor:pointer}
 button.el.link:hover{filter:brightness(.94)}
-button.el:focus-visible{outline:2px solid #16494A;outline-offset:2px}
+button.el:focus-visible{outline:3px solid #6B4FA0;outline-offset:2px}
+.marker{position:absolute;display:none;width:26px;height:26px;border-radius:13px;background:#6B4FA0;color:#fff;font:600 13px/26px Inter,system-ui,sans-serif;text-align:center;box-shadow:0 0 0 3px #fff;z-index:5}
+.notes-on .marker{display:block}
+#notes{margin:0 16px 24px;padding:16px 20px;background:#EFEAF7;border-radius:8px;color:#2d2540;max-width:1100px}
+#notes h2{font-size:15px;margin:0 0 8px}
+#notes li{margin:6px 0;font-size:14px;line-height:1.45}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head><body>
-<div id="tabs"><button id="restart">Restart flow</button><span id="label" style="color:#dfe5e5;font:500 13px Inter,system-ui,sans-serif;align-self:center;margin-left:8px"></span></div><div id="wrap"><div id="stage"></div></div>
+<div id="bar"><button id="restart" type="button">Restart flow</button><button id="ovw" type="button">Flow overview</button>
+<button id="notesbtn" type="button" aria-pressed="false">Show design notes</button><span id="label" aria-live="polite"></span></div>
+<div id="wrap"><div id="stage"></div></div><div id="notes" hidden></div>
 <script>
-// MotorPH pre-payroll check, mid-fidelity interactive wireframe.
+// MotorPH pre-payroll check, mid-fidelity interactive wireframe, version 2.
 // Concept Direction 1: help Rachel find a problem before an employee does.
-// buildSpec("path") -> one clean click-through path (Figma).
+// buildSpec("path") -> one clean click-through path for Figma.
 // buildSpec("full") -> every state, so figures can be resolved in any order (HTML preview).
 
 var C = {
@@ -28,7 +38,7 @@ var C = {
   ink: "#1E2A2B", ink2: "#4B5759", ink3: "#7D8889", fill: "#EEF0F0",
   accent: "#16494A", accentSoft: "#E3EEEE",
   red: "#A83232", redSoft: "#F8E7E5", amber: "#8A5A06", amberSoft: "#FBF0D9",
-  green: "#2E6B3A", greenSoft: "#E4F1E6"
+  green: "#2E6B3A", greenSoft: "#E4F1E6", note: "#6B4FA0", noteSoft: "#EFEAF7"
 };
 var W = 1440, H = 1024, CX = 272, CW = 1136;
 
@@ -41,7 +51,7 @@ var BTN = {
   navActive: { fill: "#E3EEEE", stroke: null, c: "#16494A", wt: "Semi Bold", align: "LEFT", r: 6, pad: 12 }
 };
 
-function Screen(id, name) { this.id = id; this.name = name; this.w = W; this.h = H; this.els = []; }
+function Screen(id, name) { this.id = id; this.name = name; this.w = W; this.h = H; this.els = []; this.notes = []; }
 Screen.prototype.rect = function (x, y, w, h, o) {
   o = o || {}; this.els.push({ k: "rect", x: x, y: y, w: w, h: h, fill: o.fill || null, stroke: o.stroke || null,
     r: o.r || 0, dash: !!o.dash, name: o.name || "Rect" }); };
@@ -51,6 +61,12 @@ Screen.prototype.text = function (x, y, v, o) {
 Screen.prototype.btn = function (x, y, w, label, to, variant, o) {
   o = o || {}; this.els.push({ k: "btn", x: x, y: y, w: w, h: o.h || 40, v: label, to: to || null,
     variant: variant || "secondary", s: o.s || 14, align: o.align || null }); };
+// Triangle arrowhead: dir is "r", "l", "d" or "u"; (x, y) is the tip.
+Screen.prototype.tri = function (x, y, dir, color) {
+  this.els.push({ k: "tri", x: x, y: y, dir: dir, fill: color || C.ink3, name: "Arrowhead" }); };
+// Annotation marker. Rendered outside the prototype in Figma, toggleable in HTML.
+Screen.prototype.note = function (x, y, title, body) {
+  this.notes.push({ n: this.notes.length + 1, x: x, y: y, t: title, v: body }); };
 function pillW(label, s) { return Math.round(label.length * ((s || 12) * 0.56) + 24); }
 Screen.prototype.pill = function (x, y, label, tone, big) {
   var t = { neutral: [C.fill, C.ink2], red: [C.redSoft, C.red], amber: [C.amberSoft, C.amber],
@@ -65,51 +81,84 @@ Screen.prototype.card = function (x, y, w, h, title) {
   if (title) this.text(x + 20, y + 18, title, { s: 16, wt: "Semi Bold" });
 };
 Screen.prototype.hr = function (x, y, w) { this.rect(x, y, w, 1, { fill: C.lineSoft, name: "Divider" }); };
+Screen.prototype.toast = function (y, msg, tone) {
+  var bg = tone === "amber" ? C.amberSoft : C.greenSoft, fg = tone === "amber" ? C.amber : C.green;
+  this.rect(CX, y, CW, 52, { fill: bg, r: 8, name: "Confirmation message" });
+  this.rect(CX + 20, y + 16, 20, 20, { fill: fg, r: 10, name: "Message icon" });
+  this.text(CX + 52, y + 16, msg, { s: 14, wt: "Medium", c: fg, w: CW - 72 });
+};
 
-// ---------- Data from MS1: bonus, tax and leave figures ----------
-var ORDER = ["b", "t", "l"];
+// ---------- Data from MS1: bonus, leave and tax figures ----------
+// Order = priority order shown on the list (High first; follow-up before the low-risk tax check).
+var ORDER = ["b", "l", "f", "t"];
+var STEP_TONE = { match: ["Match", "green"], miss: ["Doesn't match", "red"], wait: ["Can't confirm yet", "amber"] };
 var FIG = {
   b: { label: "Performance bonus", emp: "A. Santos", role: "Sales Associate", value: "PHP 8,500", fixed: "PHP 6,800",
+    priority: "High", impact: "Overpaid by PHP 1,700",
     reason: "Uses bonus Scheme B, but the employee is assigned Scheme A",
     steps: [
       { name: "Records", rows: [["Used in payroll", "Base salary PHP 34,000"], ["Employee's record", "Base salary PHP 34,000"]],
-        src: "Salary history, effective Jun 1, 2026", match: true },
+        src: "Salary history, effective Jun 1, 2026", st: "match" },
       { name: "Rule", rows: [["Rule applied", "Scheme B, 25% of base"], ["Rule assigned to employee", "Scheme A, 20% of base"]],
-        src: "Bonus criteria, version 2 (Mar 2026)", match: false },
+        src: "Bonus criteria, version 2 (Mar 2026)", st: "miss" },
       { name: "Result", rows: [["Computed in this run", "PHP 8,500"], ["Expected under assigned rule", "PHP 6,800"]],
-        src: "PHP 34,000 x 20% = PHP 6,800", match: false }],
+        src: "PHP 34,000 x 20% = PHP 6,800", st: "miss" }],
     action: "correct", done: "Corrected", outcome: "Corrected from PHP 8,500 to PHP 6,800",
+    changes: [["Bonus rule", "Scheme B (25%)", "Scheme A (20%)", "Bonus criteria v2"],
+              ["Performance bonus", "PHP 8,500", "PHP 6,800", "PHP 34,000 x 20%"]],
+    why: "Scheme B was applied by mistake. The bonus criteria assign Scheme A to Sales Associates.",
     toast: "Bonus for A. Santos corrected to PHP 6,800 and rechecked. All three steps now match." },
+  l: { label: "Leave deduction", emp: "M. Lim", role: "Parts Clerk", value: "- PHP 1,000", fixed: "PHP 0",
+    priority: "High", impact: "Underpaid by PHP 1,000",
+    reason: "Sep 6 absence was deducted, but approved sick leave is on file",
+    steps: [
+      { name: "Records", rows: [["Time card", "Absent Sep 6, 1 day deducted"], ["Employee's leave record", "Sick leave approved Sep 5"]],
+        src: "Time card and digital leave log", st: "miss" },
+      { name: "Rule", rows: [["Rule applied", "Unpaid absence"], ["Rule that should apply", "Paid sick leave, 4 days left"]],
+        src: "Leave policy", st: "miss" },
+      { name: "Result", rows: [["Computed in this run", "- PHP 1,000"], ["Expected under the rule", "PHP 0"]],
+        src: "Daily rate PHP 1,000", st: "miss" }],
+    action: "correct", done: "Corrected", outcome: "Corrected from - PHP 1,000 to PHP 0",
+    changes: [["Absence on Sep 6", "Unpaid absence", "Paid sick leave", "Leave log, approved Sep 5"],
+              ["Leave deduction", "- PHP 1,000", "PHP 0", "Leave policy"],
+              ["Sick leave balance", "4 days", "3 days", "Leave log"]],
+    why: "Approved sick leave was in the leave log but not linked to the time card.",
+    toast: "Leave deduction for M. Lim corrected to PHP 0 and rechecked. All three steps now match." },
+  f: { label: "Leave deduction", emp: "J. Ramos", role: "Accounting Clerk", value: "- PHP 1,050", fixed: "PHP 0 for now",
+    priority: "Medium", impact: "Waiting on supervisor",
+    reason: "Sep 11 absence has a leave request still waiting for approval",
+    steps: [
+      { name: "Records", rows: [["Time card", "Absent Sep 11, 1 day deducted"], ["Employee's leave record", "Requested Sep 10, not approved"]],
+        src: "Time card and digital leave log", st: "wait" },
+      { name: "Rule", rows: [["Rule applied", "Unpaid absence"], ["Rule if approved", "Paid vacation leave, 6 days left"]],
+        src: "Leave policy", st: "wait" },
+      { name: "Result", rows: [["Computed in this run", "- PHP 1,050"], ["Expected", "PHP 0 if approved, - PHP 1,050 if not"]],
+        src: "Daily rate PHP 1,050", st: "wait" }],
+    action: "follow", done: "Needs follow-up", outcome: "No deduction this period; reminder sent to K. Reyes",
+    toast: "J. Ramos's leave set to needs follow-up. Reminder sent to K. Reyes. No deduction this period." },
   t: { label: "Withholding tax", emp: "R. Dela Cruz", role: "Service Technician", value: "PHP 1,204.10", fixed: "PHP 1,204.10",
+    priority: "Medium", impact: "PHP 400 lower than last period",
     reason: "Withholding is PHP 400 lower than last pay period",
     steps: [
       { name: "Records", rows: [["Taxable pay in payroll", "PHP 18,000 (2 unpaid days)"], ["Employee's record", "2 unpaid leave days, Sep 8 to 9"]],
-        src: "Time card and leave log", match: true },
+        src: "Time card and leave log", st: "match" },
       { name: "Rule", rows: [["Rule applied", "Semi-monthly table, PHP 16,667 to 33,332"], ["Rule expected for PHP 18,000", "Same bracket"]],
-        src: "Withholding tax table", match: true },
+        src: "Withholding tax table", st: "match" },
       { name: "Result", rows: [["Computed in this run", "PHP 1,204.10"], ["Expected under the rule", "PHP 1,204.10"]],
-        src: "PHP 937.50 + 20% of PHP 1,333", match: true }],
+        src: "PHP 937.50 + 20% of PHP 1,333", st: "match" }],
     action: "check", done: "Checked", outcome: "No change needed",
-    toast: "Withholding tax for R. Dela Cruz marked as checked. No change was needed." },
-  l: { label: "Leave deduction", emp: "M. Lim", role: "Parts Clerk", value: "- PHP 1,000", fixed: "PHP 0",
-    reason: "Sep 6 absence was deducted, but approved leave is on file",
-    steps: [
-      { name: "Records", rows: [["Time card", "Absent Sep 6, 1 day deducted"], ["Employee's leave record", "Sick leave approved Sep 5"]],
-        src: "Time card and digital leave log", match: false },
-      { name: "Rule", rows: [["Rule applied", "Unpaid absence"], ["Rule that should apply", "Paid sick leave, 4 days left"]],
-        src: "Leave policy", match: false },
-      { name: "Result", rows: [["Computed in this run", "- PHP 1,000"], ["Expected under the rule", "PHP 0"]],
-        src: "Daily rate PHP 1,000", match: false }],
-    action: "correct", done: "Corrected", outcome: "Corrected from - PHP 1,000 to PHP 0",
-    toast: "Leave deduction for M. Lim corrected to PHP 0 and rechecked. All three steps now match." }
+    toast: "Withholding tax for R. Dela Cruz marked as checked. No change was needed." }
 };
+var DONE_TONE = { Corrected: "green", Checked: "green", "Needs follow-up": "amber" };
 
 function key(S) { return ORDER.filter(function (k) { return S.indexOf(k) >= 0; }).join(""); }
 function listId(S, last) { return "list_" + key(S) + "_" + (last || ""); }
 function traceId(X, S) { return "trace_" + X + "_" + key(S); }
+function actId(X, S) { return "act_" + X + "_" + key(S); }
 
 // ---------- App chrome ----------
-function shell(id, name, title, sub, homeTo, crumb) {
+var PH = [["ph_runs", "Payroll runs"], ["ph_records", "Employee records"], ["ph_leave", "Leave log"]];
+function shell(id, name, title, sub, homeTo, crumb, activeNav) {
   var s = new Screen(id, name);
   s.rect(0, 0, W, H, { fill: C.bg, name: "Background" });
   s.rect(0, 0, W, 64, { fill: C.surface, stroke: C.line, name: "Top bar" });
@@ -119,13 +168,13 @@ function shell(id, name, title, sub, homeTo, crumb) {
   s.text(1262, 16, "Rachel Martinez", { s: 13, wt: "Semi Bold" });
   s.text(1262, 34, "Payroll staff", { s: 12, c: C.ink3 });
   s.rect(0, 64, 240, H - 64, { fill: C.surface, stroke: C.line, name: "Side nav" });
-  s.btn(16, 88, 208, "Pre-payroll check", homeTo, "navActive");
-  ["Payroll runs", "Employee records", "Leave log"].forEach(function (n, i) { s.btn(16, 136 + i * 48, 208, n, null, "nav"); });
+  s.btn(16, 88, 208, "Pre-payroll check", homeTo, activeNav ? "nav" : "navActive");
+  PH.forEach(function (p, i) { s.btn(16, 136 + i * 48, 208, p[1], p[0], activeNav === p[0] ? "navActive" : "nav"); });
   s.hr(16, 296, 208);
-  s.text(28, 312, "Payroll cut-off", { s: 12, c: C.ink3 });
-  s.text(28, 330, "Sep 30, 2026, 5:00 PM", { s: 13, wt: "Semi Bold" });
+  s.text(28, 312, "Pay date", { s: 12, c: C.ink3 });
+  s.text(28, 330, "Sep 30, 2026", { s: 13, wt: "Semi Bold" });
   var y = 96;
-  if (crumb) { s.btn(CX, 92, 260, crumb[0], crumb[1], "link", { h: 28, s: 13 }); y = 128; }
+  if (crumb) { s.btn(CX, 92, 300, crumb[0], crumb[1], "link", { h: 28, s: 13 }); y = 128; }
   s.text(CX, y, title, { s: 26, wt: "Semi Bold" });
   s.text(CX, y + 40, sub, { s: 14, c: C.ink2 });
   s.contentTop = y + 80;
@@ -136,24 +185,23 @@ function shell(id, name, title, sub, homeTo, crumb) {
 function listScreen(S, last, has, name) {
   var left = ORDER.length - S.length, id = listId(S, last);
   var s = shell(id, name, "Pre-payroll check",
-    "Pay period Sep 1 to 15, 2026. Payslips stay with payroll until every flagged figure is checked.", listId(S, ""));
+    "Pay period Sep 1 to 15, 2026. Payslips stay with payroll until every flagged figure is handled.", listId(S, ""));
+  var follow = S.filter(function (k) { return FIG[k].action === "follow"; }).length;
 
   if (left > 0) s.btn(W - 32 - 200, 100, 200, "Release payroll", null, "disabled");
   else s.btn(W - 32 - 200, 100, 200, "Release payroll", "released", "primary");
-  s.text(W - 32 - 360, 148, left > 0 ? "Locked until " + left + (left === 1 ? " figure is" : " figures are") + " checked"
-    : "All figures checked. Ready to release.", { s: 12, w: 360, align: "RIGHT", c: left > 0 ? C.ink3 : C.green, wt: "Medium" });
+  s.text(W - 32 - 400, 148, left > 0 ? "Locked until " + left + (left === 1 ? " figure is" : " figures are") + " handled"
+    : "All figures handled. Ready to release.", { s: 12, w: 400, align: "RIGHT", c: left > 0 ? C.ink3 : C.green, wt: "Medium" });
+  s.note(W - 32 - 200, 100, "Locked release (H5)",
+    "Payslips can't reach employees while a figure is unhandled. Answers the empathy-map frustration that discrepancies aren't caught until employees flag confusion.");
 
   var y = s.contentTop;
-  if (last) {
-    s.rect(CX, y, CW, 52, { fill: C.greenSoft, r: 8, name: "Confirmation message" });
-    s.rect(CX + 20, y + 16, 20, 20, { fill: C.green, r: 10, name: "Success icon" });
-    s.text(CX + 52, y + 16, FIG[last].toast, { s: 14, wt: "Medium", c: C.green });
-    y += 68;
-  }
+  if (last) { s.toast(y, FIG[last].toast, FIG[last].action === "follow" ? "amber" : "green");
+    s.note(CX + CW, y, "Confirmation message", "Shows that the action worked and what changed (MS2 reflection 3b)."); y += 68; }
 
   var cw = (CW - 32) / 3;
-  [["Figures left to check", String(left), "of 3 flagged before release", left ? C.red : C.green],
-   ["Checked or corrected", String(S.length), S.length ? S.map(function (k) { return FIG[k].label; }).join(", ") : "None yet", C.ink],
+  [["Figures left to handle", String(left), "of 4 flagged before release", left ? C.red : C.green],
+   ["Handled", String(S.length), follow ? follow + " needs follow-up next period" : "Checked, corrected or set to follow-up", C.ink],
    ["Employees in this run", "48", "Sample data", C.ink]].forEach(function (k, i) {
     var x = CX + i * (cw + 16);
     s.card(x, y, cw, 108);
@@ -161,34 +209,40 @@ function listScreen(S, last, has, name) {
     s.text(x + 20, y + 40, k[1], { s: 28, wt: "Semi Bold", c: k[3] });
     s.text(x + 20, y + 80, k[2], { s: 12, c: C.ink3, w: cw - 40 });
   });
-  // progress bar across the three figures
+  s.note(CX + cw, y, "Figures left count (H5)", "Explains why release is locked and how close Rachel is to releasing.");
   y += 124;
+  var bw = (CW - 24) / 4;
   ORDER.forEach(function (k, i) {
-    var bw = (CW - 16) / 3;
-    s.rect(CX + i * (bw + 8), y, bw, 6, { fill: S.indexOf(k) >= 0 ? C.green : C.line, r: 3, name: "Progress segment" });
+    var done = S.indexOf(k) >= 0;
+    s.rect(CX + i * (bw + 8), y, bw, 6, { fill: done ? (FIG[k].action === "follow" ? C.amber : C.green) : C.line, r: 3, name: "Progress segment" });
   });
 
   y += 22;
-  var RH = 76, hh = 76 + 40 + ORDER.length * RH + 8;
+  var RH = 72, hh = 76 + 40 + ORDER.length * RH + 8;
   s.card(CX, y, CW, hh, "Flagged figures");
-  s.text(CX + 20, y + 44, "The check found these before any payslip was sent. Trace a figure to see its records, rule and result.",
+  s.text(CX + 20, y + 44, "Found before any payslip was sent. Sorted by priority: High means pay is likely wrong by more than PHP 500.",
     { s: 13, c: C.ink2 });
-  var cols = [20, 220, 380, 820, 990];
+  var cols = [20, 120, 300, 440, 840, 1000];
   s.rect(CX + 1, y + 76, CW - 2, 40, { fill: C.fill, name: "Table header" });
-  ["Figure", "Employee", "Why it was flagged", "Status", ""].forEach(function (h, i) {
+  ["Priority", "Figure", "Employee", "Why it was flagged", "Status", ""].forEach(function (h, i) {
     s.text(CX + cols[i], y + 88, h, { s: 12, wt: "Semi Bold", c: C.ink2 }); });
+  s.note(CX + 92, y + 96, "Priority and sort order (H1)",
+    "Answers 'where do I start?'. High figures first; the follow-up figure comes before the low-risk tax check because it waits on someone else.");
+  s.note(CX + cols[3] + 160, y + 96, "One list, many record types",
+    "Bonus, leave and tax together show the recurring pattern across Rachel, Melissa and Miguel (MS1 1.3), not one incident.");
   ORDER.forEach(function (k, i) {
     var f = FIG[k], ry = y + 116 + i * RH, done = S.indexOf(k) >= 0;
     if (i) s.hr(CX + 20, ry, CW - 40);
-    s.text(CX + cols[0], ry + 18, f.label, { s: 14, wt: "Semi Bold" });
-    s.text(CX + cols[0], ry + 40, done ? f.fixed : f.value, { s: 13, c: C.ink2 });
-    s.text(CX + cols[1], ry + 18, f.emp, { s: 14, wt: "Medium" });
-    s.text(CX + cols[1], ry + 40, f.role, { s: 12, c: C.ink3 });
-    s.text(CX + cols[2], ry + 18, f.reason, { s: 14, w: 410, c: done ? C.ink3 : C.ink });
-    s.pill(CX + cols[3], ry + 26, done ? f.done : "To check", done ? "green" : "amber");
-    if (done) s.text(CX + cols[4], ry + 28, "Done", { s: 13, c: C.ink3, w: 120, align: "CENTER" });
+    s.pill(CX + cols[0], ry + 24, f.priority, f.priority === "High" ? "red" : "neutral");
+    s.text(CX + cols[1], ry + 16, f.label, { s: 14, wt: "Semi Bold" });
+    s.text(CX + cols[1], ry + 38, done ? f.fixed : f.value, { s: 13, c: C.ink2 });
+    s.text(CX + cols[2], ry + 16, f.emp, { s: 14, wt: "Medium" });
+    s.text(CX + cols[2], ry + 38, f.role, { s: 12, c: C.ink3 });
+    s.text(CX + cols[3], ry + 16, f.reason, { s: 14, w: 370, c: done ? C.ink3 : C.ink });
+    s.pill(CX + cols[4], ry + 24, done ? f.done : "To check", done ? DONE_TONE[f.done] : "neutral");
+    if (done) s.text(CX + cols[5], ry + 26, "Done", { s: 13, c: C.ink3, w: 116, align: "CENTER" });
     else { var to = has(traceId(k, S)) ? traceId(k, S) : null;
-      s.btn(CX + cols[4], ry + 18, 120, "Trace", to, "secondary", { h: 38 }); }
+      s.btn(CX + cols[5], ry + 17, 116, "Trace", to, "secondary", { h: 38 }); }
   });
   s.text(CX, y + hh + 16, "Every figure is traced the same way: 1 Records, 2 Rule, 3 Result.", { s: 13, c: C.ink3 });
   return s;
@@ -197,154 +251,378 @@ function listScreen(S, last, has, name) {
 // ---------- Three-step trace ----------
 function traceScreen(X, S, name) {
   var f = FIG[X], id = traceId(X, S), back = listId(S, "");
-  var after = listId(S.concat([X]), X);
   var s = shell(id, name, "Trace: " + f.label,
     f.emp + ", " + f.role + ". Pay period Sep 1 to 15, 2026.", back, ["Back to pre-payroll check", back]);
-  var nMatch = f.steps.filter(function (st) { return st.match; }).length, all = nMatch === 3;
+  var nMatch = f.steps.filter(function (st) { return st.st === "match"; }).length;
+  var wait = f.steps.some(function (st) { return st.st === "wait"; });
+  var kind = nMatch === 3 ? "match" : wait ? "wait" : "miss";
 
   var y = s.contentTop;
   s.card(CX, y, CW, 104);
   s.text(CX + 20, y + 18, "Figure in this run", { s: 13, c: C.ink2 });
   s.text(CX + 20, y + 42, f.value, { s: 28, wt: "Semi Bold" });
-  s.text(CX + 340, y + 18, "Why it was flagged", { s: 13, c: C.ink2 });
-  s.text(CX + 340, y + 44, f.reason, { s: 15, wt: "Medium", w: 460 });
-  s.text(CX + CW - 20 - 260, y + 18, "Compared with the employee's record", { s: 13, c: C.ink2, w: 260, align: "RIGHT" });
-  var ov = all ? "Matches" : "Doesn't match", ow = pillW(ov, 14) + 8;
-  s.pill(CX + CW - 20 - ow, y + 46, ov, all ? "green" : "red", true);
+  s.text(CX + 300, y + 18, "Why it was flagged", { s: 13, c: C.ink2 });
+  s.text(CX + 300, y + 44, f.reason, { s: 15, wt: "Medium", w: 480 });
+  s.text(CX + CW - 20 - 280, y + 18, "Compared with the employee's record", { s: 13, c: C.ink2, w: 280, align: "RIGHT" });
+  var ov = { match: ["Matches", "green"], miss: ["Doesn't match", "red"], wait: ["Waiting on supervisor", "amber"] }[kind];
+  var ow = pillW(ov[0], 14) + 8;
+  s.pill(CX + CW - 20 - ow, y + 46, ov[0], ov[1], true);
 
   y += 120;
   var sw = (CW - 32) / 3, sh = 300;
+  s.note(CX, y, "Three-step trace (POV)",
+    "Records, Rule, Result answers the POV need to confirm and explain how a figure was calculated, and Rachel's 'I just need to see how this number was actually generated.'");
   f.steps.forEach(function (st, i) {
-    var x = CX + i * (sw + 16);
+    var x = CX + i * (sw + 16), tone = STEP_TONE[st.st];
     s.card(x, y, sw, sh);
-    if (!st.match) s.rect(x, y, 4, sh, { fill: C.red, r: 2, name: "Mismatch marker" });
+    if (st.st !== "match") s.rect(x, y, 4, sh, { fill: st.st === "wait" ? C.amber : C.red, r: 2, name: "Status marker" });
     s.rect(x + 20, y + 20, 28, 28, { fill: C.accentSoft, r: 14, name: "Step number" });
     s.text(x + 20, y + 25, String(i + 1), { s: 13, wt: "Semi Bold", c: C.accent, w: 28, align: "CENTER" });
     s.text(x + 60, y + 23, st.name, { s: 16, wt: "Semi Bold" });
-    var lbl = st.match ? "Match" : "Doesn't match", lw = pillW(lbl);
-    s.pill(x + sw - 20 - lw, y + 22, lbl, st.match ? "green" : "red");
+    var lw = pillW(tone[0]);
+    s.pill(x + sw - 20 - lw, y + 22, tone[0], tone[1]);
     st.rows.forEach(function (r, j) {
       var ry = y + 68 + j * 74;
       if (j) s.hr(x + 20, ry - 10, sw - 40);
       s.text(x + 20, ry, r[0], { s: 12, c: C.ink3 });
-      s.text(x + 20, ry + 20, r[1], { s: 15, wt: "Semi Bold", w: sw - 40, c: !st.match && j === 0 ? C.red : C.ink });
+      s.text(x + 20, ry + 20, r[1], { s: 15, wt: "Semi Bold", w: sw - 40, c: st.st === "miss" && j === 0 ? C.red : C.ink });
     });
     s.hr(x + 20, y + 214, sw - 40);
     s.text(x + 20, y + 228, i === 2 ? "How it is worked out" : "Source", { s: 12, c: C.ink3 });
     s.text(x + 20, y + 248, st.src, { s: 13, c: C.ink2, w: sw - 40 });
   });
+  s.note(CX + sw, y, "Match labels (H2)",
+    "Match, Doesn't match and Can't confirm yet show disagreements at a glance. Mirrors the pain that salary records can silently disagree with employee documents.");
+  s.note(CX + 2 * sw + 16, y + 214, "Named sources",
+    "Each step names its source, replacing Rachel's 'tracking down information after the fact'.");
 
   y += sh + 16;
-  s.card(CX, y, CW, 112, "Is this figure right?");
-  s.text(CX + 20, y + 50, all ? "All three steps match the employee's record. Mark the figure as checked."
-    : (3 - nMatch) + " of 3 steps don't match the employee's record. Correct the figure and the check runs again.",
-    { s: 14, c: C.ink2, w: 680 });
-  var bx = CX + CW - 20 - 200;
-  s.btn(bx, y + 36, 200, "Correct and recheck", after, all ? "secondary" : "primary");
-  s.btn(bx - 12 - 180, y + 36, 180, "Mark as checked", after, all ? "primary" : "secondary");
+  s.card(CX, y, CW, 150, "Is this figure right?");
+  var guide = { match: "All three steps match the employee's record. Mark the figure as checked.",
+    miss: (3 - nMatch) + " of 3 steps don't match the employee's record. Correct it, and the check runs again.",
+    wait: "This figure depends on a leave approval that hasn't happened yet. Set it for follow-up so it doesn't block release." }[kind];
+  s.text(CX + 20, y + 50, guide, { s: 14, c: C.ink2, w: 440 });
+  var acts = [
+    ["Mark as checked", "Confirms the figure as it is", "match", listId(S.concat([X]), X)],
+    ["Correct and recheck", "Shows every change before saving", "miss", actId(X, S)],
+    ["Needs follow-up", "For figures waiting on someone else", "wait", actId(X, S)]];
+  acts.forEach(function (a, i) {
+    var bx = CX + CW - 20 - (3 - i) * 200 - (2 - i) * 12, on = a[2] === kind;
+    s.btn(bx, y + 44, 200, a[0], on ? a[3] : null, on ? "primary" : "disabled");
+    s.text(bx, y + 92, a[1], { s: 12, c: on ? C.ink2 : C.ink3, w: 200, align: "CENTER" });
+  });
+  s.note(CX + CW, y, "Only the right action is enabled (H3, H4)",
+    "Each action says what it does underneath, so Rachel isn't unsure what Correct and recheck involves.");
+  return s;
+}
+
+// ---------- Correction screen ----------
+function correctScreen(X, S, name) {
+  var f = FIG[X], back = traceId(X, S), after = listId(S.concat([X]), X);
+  var s = shell(actId(X, S), name, "Correct: " + f.label, f.emp + ", " + f.role + ". Review the changes before saving.",
+    listId(S, ""), ["Back to trace", back]);
+  var y = s.contentTop, LW = 740, RX = CX + LW + 16, RW = CW - LW - 16;
+  var RH = 60, ch = 60 + 40 + f.changes.length * RH + 8;
+  s.card(CX, y, LW, ch, "What will change");
+  var cols = [20, 180, 360, 540];
+  s.rect(CX + 1, y + 60, LW - 2, 40, { fill: C.fill, name: "Table header" });
+  ["Item", "Now", "After correction", "Based on"].forEach(function (h, i) {
+    s.text(CX + cols[i], y + 72, h, { s: 12, wt: "Semi Bold", c: C.ink2 }); });
+  f.changes.forEach(function (r, i) {
+    var ry = y + 100 + i * RH;
+    if (i) s.hr(CX + 20, ry, LW - 40);
+    s.text(CX + cols[0], ry + 18, r[0], { s: 14, wt: "Medium", w: 160 });
+    s.text(CX + cols[1], ry + 18, r[1], { s: 14, c: C.red, w: 160 });
+    s.text(CX + cols[2], ry + 18, r[2], { s: 14, wt: "Semi Bold", c: C.green, w: 170 });
+    s.text(CX + cols[3], ry + 18, r[3], { s: 13, c: C.ink2, w: 180 });
+  });
+  s.note(CX, y, "Change preview (H3)",
+    "Shows exactly what Correct and recheck changes before anything is saved. Based on the Bonus Scheme Mix-Up and Missing Leave Request Form incidents.");
+
+  var ny = y + ch + 16;
+  s.card(CX, ny, LW, 160, "Reason for the correction (required)");
+  s.rect(CX + 20, ny + 52, LW - 40, 88, { fill: C.surface, stroke: C.accent, r: 6, name: "Text area" });
+  s.text(CX + 36, ny + 66, f.why, { s: 14, w: LW - 72 });
+  s.note(CX + LW, ny, "Audit note (POV: explain)",
+    "A required reason lets Rachel explain the figure later if an employee asks.");
+
+  s.card(RX, y, RW, 268, "What happens when you save");
+  ["The change is saved with your name and reason.", "The check runs again on this figure.",
+   "If all three steps match, the figure is marked Corrected and leaves the list."].forEach(function (t, i) {
+    var sy = y + 60 + i * 64;
+    s.rect(RX + 20, sy, 24, 24, { fill: C.accentSoft, r: 12, name: "Step number" });
+    s.text(RX + 20, sy + 3, String(i + 1), { s: 12, wt: "Semi Bold", c: C.accent, w: 24, align: "CENTER" });
+    s.text(RX + 56, sy + 2, t, { s: 14, c: C.ink2, w: RW - 76 });
+  });
+  s.btn(RX, y + 284, RW, "Save correction and recheck", after, "primary");
+  s.btn(RX, y + 336, RW, "Cancel", back, "secondary");
+  s.note(RX + RW, y, "Predictable recheck", "Spells out the recheck so the action has no surprises.");
+  return s;
+}
+
+// ---------- Follow-up screen ----------
+function followScreen(X, S, name) {
+  var f = FIG[X], back = traceId(X, S), after = listId(S.concat([X]), X);
+  var s = shell(actId(X, S), name, "Needs follow-up: " + f.label, f.emp + ", " + f.role + ". This figure is waiting on someone else.",
+    listId(S, ""), ["Back to trace", back]);
+  var y = s.contentTop, LW = 740, RX = CX + LW + 16, RW = CW - LW - 16;
+  s.card(CX, y, LW, 120, "Waiting on");
+  s.rect(CX + 20, y + 56, 44, 44, { fill: C.fill, stroke: C.line, r: 22, name: "Avatar" });
+  s.text(CX + 78, y + 56, "K. Reyes, Supervisor, Accounting", { s: 15, wt: "Semi Bold" });
+  s.text(CX + 78, y + 80, "Leave request submitted Sep 10. Waiting 4 days for approval.", { s: 13, c: C.ink2 });
+  s.note(CX, y, "Figures that depend on others (H4)",
+    "Based on the Missing Leave Request Form and Latent Leave Request Processing incidents.");
+
+  var py = y + 136;
+  s.card(CX, py, LW, 200, "Pay for this period");
+  [["Pay without the deduction for now", "If the leave is declined, PHP 1,050 is deducted next period.", true],
+   ["Keep the deduction for now", "If the leave is approved, PHP 1,050 is refunded next period.", false]].forEach(function (o, i) {
+    var oy = py + 56 + i * 68;
+    s.rect(CX + 20, oy, LW - 40, 56, { fill: o[2] ? C.accentSoft : C.surface, stroke: o[2] ? C.accent : C.line, r: 6, name: "Option" });
+    s.rect(CX + 36, oy + 18, 20, 20, { fill: C.surface, stroke: o[2] ? C.accent : C.line, r: 10, name: "Radio" });
+    if (o[2]) s.rect(CX + 41, oy + 23, 10, 10, { fill: C.accent, r: 5, name: "Radio selected" });
+    s.text(CX + 68, oy + 8, o[0], { s: 14, wt: "Semi Bold" });
+    s.text(CX + 68, oy + 30, o[1], { s: 13, c: C.ink2 });
+  });
+  s.note(CX + LW, py, "Rachel decides the pay effect",
+    "Another person's delay doesn't block release, and the employee isn't surprised by a deduction.");
+
+  var ry = py + 216;
+  s.card(CX, ry, LW, 150, "Reminder to K. Reyes");
+  s.rect(CX + 20, ry + 52, LW - 40, 78, { fill: C.fill, r: 6, name: "Message preview" });
+  s.text(CX + 36, ry + 64, "J. Ramos's vacation leave for Sep 11 is waiting for your approval. Payroll for Sep 1 to 15 is released today.",
+    { s: 13, c: C.ink2, w: LW - 72 });
+  s.note(CX + LW, ry, "Reminder, not paper",
+    "Replaces chasing paper forms: 'A digital leave log would save me so much back-and-forth' (empathy map).");
+
+  s.card(RX, y, RW, 268, "What happens next");
+  ["Status becomes Needs follow-up. It no longer blocks release.", "The reminder is sent to K. Reyes.",
+   "The figure comes back on the Sep 16 to 30 check until the leave is decided."].forEach(function (t, i) {
+    var sy = y + 60 + i * 64;
+    s.rect(RX + 20, sy, 24, 24, { fill: C.accentSoft, r: 12, name: "Step number" });
+    s.text(RX + 20, sy + 3, String(i + 1), { s: 12, wt: "Semi Bold", c: C.accent, w: 24, align: "CENTER" });
+    s.text(RX + 56, sy + 2, t, { s: 14, c: C.ink2, w: RW - 76 });
+  });
+  s.btn(RX, y + 284, RW, "Send reminder and mark for follow-up", after, "primary");
+  s.btn(RX, y + 336, RW, "Cancel", back, "secondary");
   return s;
 }
 
 // ---------- Released ----------
 function releasedScreen(name) {
-  var done = ORDER, home = listId(ORDER, "");
-  var s = shell("released", name, "Payroll released",
-    "Pay period Sep 1 to 15, 2026, released today at 3:15 PM.", home);
+  var home = listId(ORDER, "");
+  var s = shell("released", name, "Payroll released", "Pay period Sep 1 to 15, 2026, released today at 3:15 PM.", home);
   var y = s.contentTop;
-  s.rect(CX, y, CW, 52, { fill: C.greenSoft, r: 8, name: "Confirmation message" });
-  s.rect(CX + 20, y + 16, 20, 20, { fill: C.green, r: 10, name: "Success icon" });
-  s.text(CX + 52, y + 16, "48 payslips were sent to employees. All 3 flagged figures were checked before release.",
-    { s: 14, wt: "Medium", c: C.green });
+  s.toast(y, "48 payslips were sent to employees. All 4 flagged figures were handled before release.", "green");
   y += 68;
-  s.card(CX, y, 740, 60 + 3 * 64 + 8, "Checked before release");
-  done.forEach(function (k, i) {
+  var LW = 740;
+  s.card(CX, y, LW, 60 + ORDER.length * 64 + 8, "Handled before release");
+  ORDER.forEach(function (k, i) {
     var f = FIG[k], ry = y + 60 + i * 64;
-    if (i) s.hr(CX + 20, ry, 700);
+    if (i) s.hr(CX + 20, ry, LW - 40);
     s.text(CX + 20, ry + 14, f.label + ", " + f.emp, { s: 14, wt: "Medium" });
     s.text(CX + 20, ry + 36, f.outcome, { s: 12, c: C.ink3 });
-    s.pill(CX + 740 - 20 - pillW(f.done), ry + 18, f.done, "green");
+    s.pill(CX + LW - 20 - pillW(f.done), ry + 18, f.done, DONE_TONE[f.done]);
   });
-  s.card(CX + 756, y, CW - 756, 164, "Next pay period");
-  s.text(CX + 776, y + 52, "The check runs again when the Sep 16 to 30 draft is ready.", { s: 14, c: C.ink2, w: CW - 796 });
-  s.btn(CX + 776, y + 104, CW - 796, "Back to pre-payroll check", home, "secondary");
+  s.note(CX, y, "Outcome summary", "Every figure and its outcome in one place, so Rachel can explain any of them later.");
+  s.card(CX + LW + 16, y, CW - LW - 16, 196, "Next pay period");
+  s.text(CX + LW + 36, y + 52, "The check runs again when the Sep 16 to 30 draft is ready. J. Ramos's leave will be on it until K. Reyes decides.",
+    { s: 14, c: C.ink2, w: CW - LW - 56 });
+  s.btn(CX + LW + 36, y + 136, CW - LW - 56, "Back to pre-payroll check", home, "secondary");
+  return s;
+}
+
+// ---------- Out-of-scope placeholders ----------
+function placeholder(id, label, name) {
+  var s = shell(id, name, label, "Not part of this prototype.", "@back", null, id);
+  var y = s.contentTop;
+  s.card(CX, y, 640, 200);
+  s.rect(CX + 24, y + 28, 40, 40, { fill: C.fill, stroke: C.line, r: 20, dash: true, name: "Placeholder icon" });
+  s.text(CX + 84, y + 28, "This area isn't part of this test", { s: 17, wt: "Semi Bold" });
+  s.text(CX + 84, y + 56, "The prototype covers the pre-payroll check only. Go back to carry on with your task.",
+    { s: 14, c: C.ink2, w: 520 });
+  s.btn(CX + 84, y + 124, 140, "Go back", "@back", "primary");
+  s.note(CX + 600, y + 8, "Out of scope (R6)", "Tells testers a click went outside the test, so it isn't mistaken for a bug.");
+  return s;
+}
+
+// ---------- Flow overview ----------
+function overview(name) {
+  var s = new Screen("overview", name);
+  s.rect(0, 0, W, H, { fill: C.surface, name: "Background" });
+  s.text(80, 64, "Pre-payroll check: flow overview", { s: 28, wt: "Semi Bold" });
+  s.text(80, 108, "Concept Direction 1: help Rachel find a problem before an employee does. H1 to H5 are the hesitation points tested.",
+    { s: 15, c: C.ink2 });
+  function box(x, y, w, n, title, sub, tags, tone) {
+    s.rect(x, y, w, 96, { fill: tone === "accent" ? C.accentSoft : C.surface, stroke: tone === "accent" ? C.accent : C.line, r: 8, name: "Box: " + title });
+    if (n) { s.rect(x + 16, y + 16, 24, 24, { fill: C.accent, r: 12, name: "Number" });
+      s.text(x + 16, y + 19, n, { s: 12, wt: "Semi Bold", c: "#FFFFFF", w: 24, align: "CENTER" }); }
+    s.text(x + (n ? 50 : 16), y + 18, title, { s: 15, wt: "Semi Bold", w: w - (n ? 66 : 32) });
+    s.text(x + 16, y + 52, sub, { s: 12, c: C.ink2, w: w - 32 });
+    (tags || []).slice().reverse().reduce(function (tx, t) { return tx - s.pill(tx - pillW(t), y - 12, t, "accent") - 6; }, x + w - 8);
+  }
+  function hl(x1, x2, y) { s.rect(Math.min(x1, x2), y - 1, Math.abs(x2 - x1), 2, { fill: C.ink3, name: "Line" }); }
+  function vl(x, y1, y2) { s.rect(x - 1, Math.min(y1, y2), 2, Math.abs(y2 - y1), { fill: C.ink3, name: "Line" }); }
+
+  box(80, 200, 240, "1", "Pre-payroll check", "Flagged figures, sorted by priority. Release locked.", ["H1", "H5"]);
+  box(400, 200, 240, "2", "Three-step trace", "Records, Rule, Result, each with a match label.", ["H2"]);
+  box(720, 200, 240, "3", "Decide", "Only the action that fits the labels is enabled.", ["H3", "H4"]);
+  hl(320, 392, 248); s.tri(400, 248, "r");
+  hl(640, 712, 248); s.tri(720, 248, "r");
+
+  box(520, 400, 240, null, "Mark as checked", "All three steps match. Goes straight back to the list.");
+  box(800, 400, 240, null, "Correction screen", "Doesn't match. Preview changes, give a reason, save and recheck.", ["H3"]);
+  box(1080, 400, 240, null, "Follow-up screen", "Can't confirm yet. Choose the pay effect, send a reminder.", ["H4"]);
+  vl(840, 296, 348); hl(640, 1200, 348);
+  [640, 920, 1200].forEach(function (x) { vl(x, 348, 392); s.tri(x, 400, "d"); });
+  s.text(652, 318, "Labels decide the path", { s: 12, c: C.ink3 });
+
+  [640, 920, 1200].forEach(function (x) { vl(x, 496, 540); });
+  hl(640, 1200, 540); vl(920, 540, 592); s.tri(920, 600, "d");
+  box(800, 600, 240, "4", "Confirmation", "A message shows what changed; the list updates.");
+
+  hl(200, 800, 648); vl(200, 304, 648); s.tri(200, 296, "u");
+  s.text(216, 616, "Repeat for the next figure, highest priority first", { s: 12, c: C.ink3 });
+
+  vl(920, 696, 792); s.tri(920, 800, "d");
+  s.text(932, 736, "0 figures left", { s: 12, c: C.ink3 });
+  box(800, 800, 240, "5", "Release payroll", "Unlocks only when every figure is handled.", ["H5"], "accent");
+  hl(1040, 1072, 848); s.tri(1080, 848, "r");
+  box(1080, 800, 240, "6", "Payroll released", "Summary of every figure and its outcome.");
+
+  s.text(80, 760, "Hesitation points", { s: 14, wt: "Semi Bold" });
+  [["H1", "Choosing where to start"], ["H2", "Deciding if a figure is right"], ["H3", "What Correct and recheck involves"],
+   ["H4", "A figure waiting on someone else"], ["H5", "Why Release payroll is locked"]].forEach(function (h, i) {
+    s.pill(80, 792 + i * 34, h[0], "accent");
+    s.text(130, 795 + i * 34, h[1], { s: 13, c: C.ink2 });
+  });
   return s;
 }
 
 // ---------- Build ----------
+function subsets(arr) {
+  var out = [[]];
+  arr.forEach(function (k) { out = out.concat(out.map(function (s) { return s.concat([k]); })); });
+  return out;
+}
 function buildSpec(mode) {
-  var want = [];
+  var want = [["overview"]];
   if (mode === "full") {
-    var subsets = [[], ["b"], ["t"], ["l"], ["b", "t"], ["b", "l"], ["t", "l"], ["b", "t", "l"]];
-    subsets.forEach(function (S) {
+    subsets(ORDER).forEach(function (S) {
       want.push(["list", S, ""]);
       S.forEach(function (k) { want.push(["list", S, k]); });
-      ORDER.forEach(function (X) { if (S.indexOf(X) < 0) want.push(["trace", X, S]); });
+      ORDER.forEach(function (X) { if (S.indexOf(X) < 0) { want.push(["trace", X, S]); if (FIG[X].action !== "check") want.push(["act", X, S]); } });
     });
+    want.push(["released"]);
   } else {
-    want = [["list", [], ""], ["trace", "b", []], ["list", ["b"], "b"], ["trace", "t", ["b"]], ["list", ["b", "t"], "t"],
-            ["trace", "l", ["b", "t"]], ["list", ["b", "t", "l"], "l"], ["released"], ["list", ["b"], ""], ["list", ["b", "t"], ""],
-            ["list", ["b", "t", "l"], ""]];
+    var S = [];
+    want.push(["list", [], ""]);
+    ORDER.forEach(function (X) {
+      want.push(["trace", X, S.slice()]);
+      if (FIG[X].action !== "check") want.push(["act", X, S.slice()]);
+      S.push(X);
+      want.push(["list", S.slice(), X]);
+    });
+    want.push(["released"]);
+    var B = [];
+    ORDER.forEach(function (X) { B.push(X); want.push(["list", B.slice(), ""]); });
   }
-  if (mode === "full") want.push(["released"]);
+  PH.forEach(function (p) { want.push(["ph", p[0], p[1]]); });
+
   var ids = {};
-  want.forEach(function (w) { ids[w[0] === "list" ? listId(w[1], w[2]) : w[0] === "trace" ? traceId(w[1], w[2]) : "released"] = 1; });
+  function wid(w) { return w[0] === "list" ? listId(w[1], w[2]) : w[0] === "trace" ? traceId(w[1], w[2]) :
+    w[0] === "act" ? actId(w[1], w[2]) : w[0] === "ph" ? w[1] : w[0]; }
+  want.forEach(function (w) { ids[wid(w)] = 1; });
   function has(id) { return !!ids[id]; }
-  var n = 0;
+  var n = -1;
   function nm(t) { n++; return (n < 10 ? "0" : "") + n + " " + t; }
   return want.map(function (w) {
+    if (w[0] === "overview") return overview(nm("Flow overview"));
     if (w[0] === "list") {
-      var left = 3 - w[1].length;
+      var left = 4 - w[1].length;
       var t = "Check list, " + left + " left" + (w[2] ? ", " + FIG[w[2]].done.toLowerCase() + " message" : (w[1].length ? ", back state" : ""));
       return listScreen(w[1], w[2], has, nm(t));
     }
-    if (w[0] === "trace") return traceScreen(w[1], w[2], nm("Trace " + FIG[w[1]].label.toLowerCase()));
+    if (w[0] === "trace") return traceScreen(w[1], w[2], nm("Trace " + FIG[w[1]].label.toLowerCase() + ", " + FIG[w[1]].emp));
+    if (w[0] === "act") return FIG[w[1]].action === "follow" ? followScreen(w[1], w[2], nm("Follow-up, " + FIG[w[1]].emp))
+      : correctScreen(w[1], w[2], nm("Correction, " + FIG[w[1]].emp));
+    if (w[0] === "ph") return placeholder(w[1], w[2], nm("Placeholder, " + w[2]));
     return releasedScreen(nm("Payroll released"));
   });
 }
-// Clickable HTML preview built from the same spec.
-(function(){
-  var screens = buildSpec("full"), byId = {};
-  var root = document.getElementById('stage');
-  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
-  function wt(w){return {"Regular":400,"Medium":500,"Semi Bold":600,"Bold":700}[w];}
-  screens.forEach(function(sc){
-    var f = document.createElement('div'); f.className='frame'; f.id='s-'+sc.id;
-    f.style.width=sc.w+'px'; f.style.height=sc.h+'px'; byId[sc.id]=f;
-    sc.els.forEach(function(e){
-      var d=document.createElement(e.k==='btn'?'button':'div'); d.className='el';
-      d.style.left=e.x+'px'; d.style.top=e.y+'px';
-      if(e.k==='rect'){d.style.width=e.w+'px';d.style.height=e.h+'px';
-        if(e.fill)d.style.background=e.fill;
-        if(e.stroke)d.style.boxShadow='inset 0 0 0 1px '+e.stroke;
-        if(e.dash){d.style.boxShadow='none';d.style.border='1px dashed '+e.stroke;}
-        d.style.borderRadius=e.r+'px';}
-      else if(e.k==='text'){d.innerHTML=esc(e.v);d.style.fontSize=e.s+'px';d.style.lineHeight=(e.s*1.4)+'px';
-        d.style.fontWeight=wt(e.wt);d.style.color=e.c;d.style.textAlign=e.align.toLowerCase();
-        if(e.w)d.style.width=e.w+'px'; else d.style.whiteSpace='nowrap';
-        if(e.u)d.style.textDecoration='underline';}
-      else { var b=BTN[e.variant]; d.style.width=e.w+'px';d.style.height=e.h+'px';
-        d.style.background=b.fill||'transparent'; d.style.borderRadius=b.r+'px';
-        d.style.boxShadow=b.stroke?'inset 0 0 0 1px '+b.stroke:(b.bar?'inset 0 -2px 0 '+b.c:'none');
-        d.style.color=b.c; d.style.fontSize=e.s+'px'; d.style.fontWeight=wt(b.wt);
-        var al=e.align||b.align; d.style.textAlign=al.toLowerCase(); d.style.padding=(b.pad||0)?'0 '+b.pad+'px':'0';
-        if(b.u)d.style.textDecoration='underline';
-        d.textContent=e.v; if(e.to){d.dataset.to=e.to;d.classList.add('link');}
-        else {d.disabled=true;}
+// Clickable HTML preview: renders each state on demand from the shared spec.
+(function () {
+  var screens = buildSpec("full"), spec = {}, built = {}, stack = [], cur = null, notesOn = false;
+  screens.forEach(function (sc) { spec[sc.id] = sc; });
+  var root = document.getElementById("stage"), label = document.getElementById("label"), panel = document.getElementById("notes");
+  function wt(w) { return { "Regular": 400, "Medium": 500, "Semi Bold": 600, "Bold": 700 }[w]; }
+  function el(tag, cls) { var d = document.createElement(tag); if (cls) d.className = cls; return d; }
+  function build(sc) {
+    var f = el("div", "frame"); f.id = "s-" + sc.id; f.style.width = sc.w + "px"; f.style.height = sc.h + "px";
+    f.setAttribute("role", "region"); f.setAttribute("aria-label", sc.name.slice(3));
+    sc.els.forEach(function (e) {
+      var d;
+      if (e.k === "rect") {
+        d = el("div", "el"); d.style.cssText = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.w + "px;height:" + e.h + "px;border-radius:" + e.r + "px;" +
+          (e.fill ? "background:" + e.fill + ";" : "") + (e.stroke ? (e.dash ? "border:1px dashed " + e.stroke : "box-shadow:inset 0 0 0 1px " + e.stroke) + ";" : "");
+        d.setAttribute("aria-hidden", "true");
+      } else if (e.k === "text") {
+        d = el("div", "el"); d.textContent = e.v;
+        d.style.cssText = "left:" + e.x + "px;top:" + e.y + "px;font-size:" + e.s + "px;line-height:" + (e.s * 1.4) + "px;font-weight:" + wt(e.wt) +
+          ";color:" + e.c + ";text-align:" + e.align.toLowerCase() + ";" + (e.w ? "width:" + e.w + "px;" : "white-space:nowrap;") + (e.u ? "text-decoration:underline;" : "");
+      } else if (e.k === "tri") {
+        d = el("div", "el tri"); var a = 7, b = 12, c = e.fill, css;
+        if (e.dir === "r") css = "left:" + (e.x - b) + "px;top:" + (e.y - a) + "px;border-width:" + a + "px 0 " + a + "px " + b + "px;border-color:transparent transparent transparent " + c;
+        if (e.dir === "l") css = "left:" + e.x + "px;top:" + (e.y - a) + "px;border-width:" + a + "px " + b + "px " + a + "px 0;border-color:transparent " + c + " transparent transparent";
+        if (e.dir === "d") css = "left:" + (e.x - a) + "px;top:" + (e.y - b) + "px;border-width:" + b + "px " + a + "px 0 " + a + "px;border-color:" + c + " transparent transparent transparent";
+        if (e.dir === "u") css = "left:" + (e.x - a) + "px;top:" + e.y + "px;border-width:0 " + a + "px " + b + "px " + a + "px;border-color:transparent transparent " + c + " transparent";
+        d.style.cssText = css; d.setAttribute("aria-hidden", "true");
+      } else {
+        var b2 = BTN[e.variant], al = (e.align || b2.align).toLowerCase();
+        d = el("button", "el"); d.type = "button"; d.textContent = e.v;
+        d.style.cssText = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.w + "px;height:" + e.h + "px;border-radius:" + b2.r + "px;background:" + (b2.fill || "transparent") +
+          ";box-shadow:" + (b2.stroke ? "inset 0 0 0 1px " + b2.stroke : "none") + ";color:" + b2.c + ";font-size:" + e.s + "px;font-weight:" + wt(b2.wt) +
+          ";text-align:" + al + ";padding:0 " + (b2.pad || 0) + "px;" + (b2.u ? "text-decoration:underline;" : "");
+        if (e.to) { d.dataset.to = e.to; d.classList.add("link"); } else { d.disabled = true; d.setAttribute("aria-disabled", "true"); }
       }
       f.appendChild(d);
     });
-    root.appendChild(f);
+    sc.notes.forEach(function (n) {
+      var m = el("div", "marker"); m.textContent = n.n; m.style.left = (n.x - 13) + "px"; m.style.top = (n.y - 13) + "px";
+      m.title = n.t; f.appendChild(m);
+    });
+    root.appendChild(f); built[sc.id] = f; return f;
+  }
+  function renderNotes(sc) {
+    panel.innerHTML = "";
+    if (!notesOn || !sc.notes.length) { panel.hidden = true; return; }
+    panel.hidden = false;
+    var h = el("h2"); h.textContent = "Design notes for this screen"; panel.appendChild(h);
+    var ol = el("ol");
+    sc.notes.forEach(function (n) { var li = el("li"), b = el("strong"); b.textContent = n.t; li.appendChild(b);
+      li.appendChild(document.createTextNode(" " + n.v)); ol.appendChild(li); });
+    panel.appendChild(ol);
+  }
+  function show(id, push) {
+    if (!spec[id]) return;
+    if (push && cur) stack.push(cur);
+    Object.keys(built).forEach(function (k) { built[k].style.display = "none"; });
+    (built[id] || build(spec[id])).style.display = "block";
+    cur = id; label.textContent = spec[id].name.slice(3);
+    document.body.classList.toggle("notes-on", notesOn);
+    renderNotes(spec[id]); fit(); history.replaceState(null, "", "#" + id);
+  }
+  root.addEventListener("click", function (ev) {
+    var t = ev.target.closest("[data-to]"); if (!t) return;
+    if (t.dataset.to === "@back") show(stack.pop() || "list__", false); else show(t.dataset.to, true);
   });
-  function show(id){Object.keys(byId).forEach(function(k){byId[k].style.display=k===id?'block':'none';});
-    label.textContent=screens.filter(function(x){return x.id===id})[0].name.slice(3);
-    fit(); history.replaceState(null,'','#'+id);}
-  root.addEventListener('click',function(ev){var t=ev.target.closest('[data-to]');if(t)show(t.dataset.to);});
-  var label=document.getElementById('label');
-  document.getElementById('restart').onclick=function(){show('list__');};
-  function fit(){var s=Math.min(1,(window.innerWidth-32)/1440);root.style.transform='scale('+s+')';
-    root.style.height=(1024*s)+'px';}
-  window.addEventListener('resize',fit);
-  window.showScreen=show;
-  var h=(location.hash||'').slice(1); show(byId[h]?h:'list__');
+  document.getElementById("restart").onclick = function () { stack = []; show("list__", false); };
+  document.getElementById("ovw").onclick = function () { show("overview", true); };
+  var nb = document.getElementById("notesbtn");
+  nb.onclick = function () { notesOn = !notesOn; nb.setAttribute("aria-pressed", notesOn); nb.textContent = notesOn ? "Hide design notes" : "Show design notes"; show(cur, false); };
+  function fit() { var s = Math.min(1, (window.innerWidth - 32) / 1440); root.style.transform = "scale(" + s + ")"; root.style.height = (1024 * s) + "px"; }
+  window.addEventListener("resize", fit);
+  window.showScreen = function (id) { show(id, false); };
+  var h0 = (location.hash || "").slice(1); show(spec[h0] ? h0 : "list__", false);
 })();
 </script></body></html>
