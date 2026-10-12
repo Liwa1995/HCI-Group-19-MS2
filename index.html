@@ -201,12 +201,12 @@ function listScreen(S, last, has, name) {
   var cw = (CW - 32) / 3;
   [["Figures left to handle", String(left), "of 4 flagged before release", left ? C.red : C.green],
    ["Handled", String(S.length), follow ? follow + " needs follow-up next period" : "Checked, corrected or set to follow-up", C.ink],
-   ["Employees in this run", "48", C.ink]].forEach(function (k, i) {
+   ["Employees in this run", "48", "", C.ink]].forEach(function (k, i) {
     var x = CX + i * (cw + 16);
     s.card(x, y, cw, 108);
     s.text(x + 20, y + 18, k[0], { s: 13, c: C.ink2 });
     s.text(x + 20, y + 40, k[1], { s: 28, wt: "Semi Bold", c: k[3] });
-    s.text(x + 20, y + 80, k[2], { s: 12, c: C.ink3, w: cw - 40 });
+    if (k[2]) s.text(x + 20, y + 80, k[2], { s: 12, c: C.ink3, w: cw - 40 });
   });
   s.note(CX + cw, y, "Figures left count (H5)", "Explains why release is locked and how close Rachel is to releasing.");
   y += 124;
