@@ -1,0 +1,350 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MotorPH pre-payroll check, interactive wireframe</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0;background:#cfd4d5;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+#tabs{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px;background:#1E2A2B}
+#tabs button{font:500 12px Inter,system-ui,sans-serif;border:0;border-radius:4px;padding:6px 10px;background:#33403f;color:#dfe5e5;cursor:pointer}
+#tabs button.on{background:#E3EEEE;color:#16494A}
+#wrap{padding:16px;overflow:hidden}
+#stage{transform-origin:0 0;width:1440px}
+.frame{position:relative;overflow:hidden;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+.el{position:absolute;box-sizing:border-box;margin:0;border:0;font-family:inherit}
+button.el{cursor:default;display:block}
+button.el.link{cursor:pointer}
+button.el.link:hover{filter:brightness(.94)}
+button.el:focus-visible{outline:2px solid #16494A;outline-offset:2px}
+</style></head><body>
+<div id="tabs"><button id="restart">Restart flow</button><span id="label" style="color:#dfe5e5;font:500 13px Inter,system-ui,sans-serif;align-self:center;margin-left:8px"></span></div><div id="wrap"><div id="stage"></div></div>
+<script>
+// MotorPH pre-payroll check, mid-fidelity interactive wireframe.
+// Concept Direction 1: help Rachel find a problem before an employee does.
+// buildSpec("path") -> one clean click-through path (Figma).
+// buildSpec("full") -> every state, so figures can be resolved in any order (HTML preview).
+
+var C = {
+  bg: "#F3F4F4", surface: "#FFFFFF", line: "#D5D9DA", lineSoft: "#E7EAEA",
+  ink: "#1E2A2B", ink2: "#4B5759", ink3: "#7D8889", fill: "#EEF0F0",
+  accent: "#16494A", accentSoft: "#E3EEEE",
+  red: "#A83232", redSoft: "#F8E7E5", amber: "#8A5A06", amberSoft: "#FBF0D9",
+  green: "#2E6B3A", greenSoft: "#E4F1E6"
+};
+var W = 1440, H = 1024, CX = 272, CW = 1136;
+
+var BTN = {
+  primary:   { fill: "#16494A", stroke: null, c: "#FFFFFF", wt: "Semi Bold", align: "CENTER", r: 6 },
+  secondary: { fill: "#FFFFFF", stroke: "#B7BEBF", c: "#1E2A2B", wt: "Medium", align: "CENTER", r: 6 },
+  disabled:  { fill: "#E7EAEA", stroke: null, c: "#9AA3A4", wt: "Medium", align: "CENTER", r: 6 },
+  link:      { fill: null, stroke: null, c: "#16494A", wt: "Semi Bold", align: "LEFT", r: 4, u: true },
+  nav:       { fill: null, stroke: null, c: "#4B5759", wt: "Medium", align: "LEFT", r: 6, pad: 12 },
+  navActive: { fill: "#E3EEEE", stroke: null, c: "#16494A", wt: "Semi Bold", align: "LEFT", r: 6, pad: 12 }
+};
+
+function Screen(id, name) { this.id = id; this.name = name; this.w = W; this.h = H; this.els = []; }
+Screen.prototype.rect = function (x, y, w, h, o) {
+  o = o || {}; this.els.push({ k: "rect", x: x, y: y, w: w, h: h, fill: o.fill || null, stroke: o.stroke || null,
+    r: o.r || 0, dash: !!o.dash, name: o.name || "Rect" }); };
+Screen.prototype.text = function (x, y, v, o) {
+  o = o || {}; this.els.push({ k: "text", x: x, y: y, w: o.w || null, v: v, s: o.s || 14, wt: o.wt || "Regular",
+    c: o.c || C.ink, align: o.align || "LEFT", u: !!o.u, name: o.name || v.slice(0, 40) }); };
+Screen.prototype.btn = function (x, y, w, label, to, variant, o) {
+  o = o || {}; this.els.push({ k: "btn", x: x, y: y, w: w, h: o.h || 40, v: label, to: to || null,
+    variant: variant || "secondary", s: o.s || 14, align: o.align || null }); };
+function pillW(label, s) { return Math.round(label.length * ((s || 12) * 0.56) + 24); }
+Screen.prototype.pill = function (x, y, label, tone, big) {
+  var t = { neutral: [C.fill, C.ink2], red: [C.redSoft, C.red], amber: [C.amberSoft, C.amber],
+    green: [C.greenSoft, C.green], accent: [C.accentSoft, C.accent] }[tone || "neutral"];
+  var s = big ? 14 : 12, h = big ? 32 : 24, w = pillW(label, s) + (big ? 8 : 0);
+  this.rect(x, y, w, h, { fill: t[0], r: h / 2, name: "Tag" });
+  this.text(x, y + (h - s * 1.4) / 2, label, { w: w, s: s, wt: "Semi Bold", c: t[1], align: "CENTER" });
+  return w;
+};
+Screen.prototype.card = function (x, y, w, h, title) {
+  this.rect(x, y, w, h, { fill: C.surface, stroke: C.line, r: 8, name: title ? "Card: " + title : "Card" });
+  if (title) this.text(x + 20, y + 18, title, { s: 16, wt: "Semi Bold" });
+};
+Screen.prototype.hr = function (x, y, w) { this.rect(x, y, w, 1, { fill: C.lineSoft, name: "Divider" }); };
+
+// ---------- Data from MS1: bonus, tax and leave figures ----------
+var ORDER = ["b", "t", "l"];
+var FIG = {
+  b: { label: "Performance bonus", emp: "A. Santos", role: "Sales Associate", value: "PHP 8,500", fixed: "PHP 6,800",
+    reason: "Uses bonus Scheme B, but the employee is assigned Scheme A",
+    steps: [
+      { name: "Records", rows: [["Used in payroll", "Base salary PHP 34,000"], ["Employee's record", "Base salary PHP 34,000"]],
+        src: "Salary history, effective Jun 1, 2026", match: true },
+      { name: "Rule", rows: [["Rule applied", "Scheme B, 25% of base"], ["Rule assigned to employee", "Scheme A, 20% of base"]],
+        src: "Bonus criteria, version 2 (Mar 2026)", match: false },
+      { name: "Result", rows: [["Computed in this run", "PHP 8,500"], ["Expected under assigned rule", "PHP 6,800"]],
+        src: "PHP 34,000 x 20% = PHP 6,800", match: false }],
+    action: "correct", done: "Corrected", outcome: "Corrected from PHP 8,500 to PHP 6,800",
+    toast: "Bonus for A. Santos corrected to PHP 6,800 and rechecked. All three steps now match." },
+  t: { label: "Withholding tax", emp: "R. Dela Cruz", role: "Service Technician", value: "PHP 1,204.10", fixed: "PHP 1,204.10",
+    reason: "Withholding is PHP 400 lower than last pay period",
+    steps: [
+      { name: "Records", rows: [["Taxable pay in payroll", "PHP 18,000 (2 unpaid days)"], ["Employee's record", "2 unpaid leave days, Oct 8 to 9"]],
+        src: "Time card and leave log", match: true },
+      { name: "Rule", rows: [["Rule applied", "Semi-monthly table, PHP 16,667 to 33,332"], ["Rule expected for PHP 18,000", "Same bracket"]],
+        src: "Withholding tax table", match: true },
+      { name: "Result", rows: [["Computed in this run", "PHP 1,204.10"], ["Expected under the rule", "PHP 1,204.10"]],
+        src: "PHP 937.50 + 20% of PHP 1,333", match: true }],
+    action: "check", done: "Checked", outcome: "No change needed",
+    toast: "Withholding tax for R. Dela Cruz marked as checked. No change was needed." },
+  l: { label: "Leave deduction", emp: "M. Lim", role: "Parts Clerk", value: "- PHP 1,000", fixed: "PHP 0",
+    reason: "Oct 6 absence was deducted, but approved leave is on file",
+    steps: [
+      { name: "Records", rows: [["Time card", "Absent Oct 6, 1 day deducted"], ["Employee's leave record", "Sick leave approved Oct 5"]],
+        src: "Time card and digital leave log", match: false },
+      { name: "Rule", rows: [["Rule applied", "Unpaid absence"], ["Rule that should apply", "Paid sick leave, 4 days left"]],
+        src: "Leave policy", match: false },
+      { name: "Result", rows: [["Computed in this run", "- PHP 1,000"], ["Expected under the rule", "PHP 0"]],
+        src: "Daily rate PHP 1,000", match: false }],
+    action: "correct", done: "Corrected", outcome: "Corrected from - PHP 1,000 to PHP 0",
+    toast: "Leave deduction for M. Lim corrected to PHP 0 and rechecked. All three steps now match." }
+};
+
+function key(S) { return ORDER.filter(function (k) { return S.indexOf(k) >= 0; }).join(""); }
+function listId(S, last) { return "list_" + key(S) + "_" + (last || ""); }
+function traceId(X, S) { return "trace_" + X + "_" + key(S); }
+
+// ---------- App chrome ----------
+function shell(id, name, title, sub, homeTo, crumb) {
+  var s = new Screen(id, name);
+  s.rect(0, 0, W, H, { fill: C.bg, name: "Background" });
+  s.rect(0, 0, W, 64, { fill: C.surface, stroke: C.line, name: "Top bar" });
+  s.rect(24, 18, 28, 28, { fill: C.accent, r: 6, name: "Logo mark" });
+  s.text(62, 21, "MotorPH Payroll", { s: 17, wt: "Bold" });
+  s.rect(1220, 16, 32, 32, { fill: C.fill, stroke: C.line, r: 16, name: "Avatar" });
+  s.text(1262, 16, "Rachel Martinez", { s: 13, wt: "Semi Bold" });
+  s.text(1262, 34, "Payroll staff", { s: 12, c: C.ink3 });
+  s.rect(0, 64, 240, H - 64, { fill: C.surface, stroke: C.line, name: "Side nav" });
+  s.btn(16, 88, 208, "Pre-payroll check", homeTo, "navActive");
+  ["Payroll runs", "Employee records", "Leave log"].forEach(function (n, i) { s.btn(16, 136 + i * 48, 208, n, null, "nav"); });
+  s.hr(16, 296, 208);
+  s.text(28, 312, "Payroll cut-off", { s: 12, c: C.ink3 });
+  s.text(28, 330, "Oct 13, 2026, 5:00 PM", { s: 13, wt: "Semi Bold" });
+  var y = 96;
+  if (crumb) { s.btn(CX, 92, 260, crumb[0], crumb[1], "link", { h: 28, s: 13 }); y = 128; }
+  s.text(CX, y, title, { s: 26, wt: "Semi Bold" });
+  s.text(CX, y + 40, sub, { s: 14, c: C.ink2 });
+  s.contentTop = y + 80;
+  return s;
+}
+
+// ---------- Pre-payroll check list ----------
+function listScreen(S, last, has, name) {
+  var left = ORDER.length - S.length, id = listId(S, last);
+  var s = shell(id, name, "Pre-payroll check",
+    "Pay period Oct 1 to 15, 2026. Payslips stay with payroll until every flagged figure is checked.", listId(S, ""));
+
+  if (left > 0) s.btn(W - 32 - 200, 100, 200, "Release payroll", null, "disabled");
+  else s.btn(W - 32 - 200, 100, 200, "Release payroll", "released", "primary");
+  s.text(W - 32 - 360, 148, left > 0 ? "Locked until " + left + (left === 1 ? " figure is" : " figures are") + " checked"
+    : "All figures checked. Ready to release.", { s: 12, w: 360, align: "RIGHT", c: left > 0 ? C.ink3 : C.green, wt: "Medium" });
+
+  var y = s.contentTop;
+  if (last) {
+    s.rect(CX, y, CW, 52, { fill: C.greenSoft, r: 8, name: "Confirmation message" });
+    s.rect(CX + 20, y + 16, 20, 20, { fill: C.green, r: 10, name: "Success icon" });
+    s.text(CX + 52, y + 16, FIG[last].toast, { s: 14, wt: "Medium", c: C.green });
+    y += 68;
+  }
+
+  var cw = (CW - 32) / 3;
+  [["Figures left to check", String(left), "of 3 flagged before release", left ? C.red : C.green],
+   ["Checked or corrected", String(S.length), S.length ? S.map(function (k) { return FIG[k].label; }).join(", ") : "None yet", C.ink],
+   ["Employees in this run", "48", "Sample data", C.ink]].forEach(function (k, i) {
+    var x = CX + i * (cw + 16);
+    s.card(x, y, cw, 108);
+    s.text(x + 20, y + 18, k[0], { s: 13, c: C.ink2 });
+    s.text(x + 20, y + 40, k[1], { s: 28, wt: "Semi Bold", c: k[3] });
+    s.text(x + 20, y + 80, k[2], { s: 12, c: C.ink3, w: cw - 40 });
+  });
+  // progress bar across the three figures
+  y += 124;
+  ORDER.forEach(function (k, i) {
+    var bw = (CW - 16) / 3;
+    s.rect(CX + i * (bw + 8), y, bw, 6, { fill: S.indexOf(k) >= 0 ? C.green : C.line, r: 3, name: "Progress segment" });
+  });
+
+  y += 22;
+  var RH = 76, hh = 76 + 40 + ORDER.length * RH + 8;
+  s.card(CX, y, CW, hh, "Flagged figures");
+  s.text(CX + 20, y + 44, "The check found these before any payslip was sent. Trace a figure to see its records, rule and result.",
+    { s: 13, c: C.ink2 });
+  var cols = [20, 220, 380, 820, 990];
+  s.rect(CX + 1, y + 76, CW - 2, 40, { fill: C.fill, name: "Table header" });
+  ["Figure", "Employee", "Why it was flagged", "Status", ""].forEach(function (h, i) {
+    s.text(CX + cols[i], y + 88, h, { s: 12, wt: "Semi Bold", c: C.ink2 }); });
+  ORDER.forEach(function (k, i) {
+    var f = FIG[k], ry = y + 116 + i * RH, done = S.indexOf(k) >= 0;
+    if (i) s.hr(CX + 20, ry, CW - 40);
+    s.text(CX + cols[0], ry + 18, f.label, { s: 14, wt: "Semi Bold" });
+    s.text(CX + cols[0], ry + 40, done ? f.fixed : f.value, { s: 13, c: C.ink2 });
+    s.text(CX + cols[1], ry + 18, f.emp, { s: 14, wt: "Medium" });
+    s.text(CX + cols[1], ry + 40, f.role, { s: 12, c: C.ink3 });
+    s.text(CX + cols[2], ry + 18, f.reason, { s: 14, w: 410, c: done ? C.ink3 : C.ink });
+    s.pill(CX + cols[3], ry + 26, done ? f.done : "To check", done ? "green" : "amber");
+    if (done) s.text(CX + cols[4], ry + 28, "Done", { s: 13, c: C.ink3, w: 120, align: "CENTER" });
+    else { var to = has(traceId(k, S)) ? traceId(k, S) : null;
+      s.btn(CX + cols[4], ry + 18, 120, "Trace", to, "secondary", { h: 38 }); }
+  });
+  s.text(CX, y + hh + 16, "Every figure is traced the same way: 1 Records, 2 Rule, 3 Result.", { s: 13, c: C.ink3 });
+  return s;
+}
+
+// ---------- Three-step trace ----------
+function traceScreen(X, S, name) {
+  var f = FIG[X], id = traceId(X, S), back = listId(S, "");
+  var after = listId(S.concat([X]), X);
+  var s = shell(id, name, "Trace: " + f.label,
+    f.emp + ", " + f.role + ". Pay period Oct 1 to 15, 2026.", back, ["Back to pre-payroll check", back]);
+  var nMatch = f.steps.filter(function (st) { return st.match; }).length, all = nMatch === 3;
+
+  var y = s.contentTop;
+  s.card(CX, y, CW, 104);
+  s.text(CX + 20, y + 18, "Figure in this run", { s: 13, c: C.ink2 });
+  s.text(CX + 20, y + 42, f.value, { s: 28, wt: "Semi Bold" });
+  s.text(CX + 340, y + 18, "Why it was flagged", { s: 13, c: C.ink2 });
+  s.text(CX + 340, y + 44, f.reason, { s: 15, wt: "Medium", w: 460 });
+  s.text(CX + CW - 20 - 260, y + 18, "Compared with the employee's record", { s: 13, c: C.ink2, w: 260, align: "RIGHT" });
+  var ov = all ? "Matches" : "Doesn't match", ow = pillW(ov, 14) + 8;
+  s.pill(CX + CW - 20 - ow, y + 46, ov, all ? "green" : "red", true);
+
+  y += 120;
+  var sw = (CW - 32) / 3, sh = 300;
+  f.steps.forEach(function (st, i) {
+    var x = CX + i * (sw + 16);
+    s.card(x, y, sw, sh);
+    if (!st.match) s.rect(x, y, 4, sh, { fill: C.red, r: 2, name: "Mismatch marker" });
+    s.rect(x + 20, y + 20, 28, 28, { fill: C.accentSoft, r: 14, name: "Step number" });
+    s.text(x + 20, y + 25, String(i + 1), { s: 13, wt: "Semi Bold", c: C.accent, w: 28, align: "CENTER" });
+    s.text(x + 60, y + 23, st.name, { s: 16, wt: "Semi Bold" });
+    var lbl = st.match ? "Match" : "Doesn't match", lw = pillW(lbl);
+    s.pill(x + sw - 20 - lw, y + 22, lbl, st.match ? "green" : "red");
+    st.rows.forEach(function (r, j) {
+      var ry = y + 68 + j * 74;
+      if (j) s.hr(x + 20, ry - 10, sw - 40);
+      s.text(x + 20, ry, r[0], { s: 12, c: C.ink3 });
+      s.text(x + 20, ry + 20, r[1], { s: 15, wt: "Semi Bold", w: sw - 40, c: !st.match && j === 0 ? C.red : C.ink });
+    });
+    s.hr(x + 20, y + 214, sw - 40);
+    s.text(x + 20, y + 228, i === 2 ? "How it is worked out" : "Source", { s: 12, c: C.ink3 });
+    s.text(x + 20, y + 248, st.src, { s: 13, c: C.ink2, w: sw - 40 });
+  });
+
+  y += sh + 16;
+  s.card(CX, y, CW, 112, "Is this figure right?");
+  s.text(CX + 20, y + 50, all ? "All three steps match the employee's record. Mark the figure as checked."
+    : (3 - nMatch) + " of 3 steps don't match the employee's record. Correct the figure and the check runs again.",
+    { s: 14, c: C.ink2, w: 680 });
+  var bx = CX + CW - 20 - 200;
+  s.btn(bx, y + 36, 200, "Correct and recheck", after, all ? "secondary" : "primary");
+  s.btn(bx - 12 - 180, y + 36, 180, "Mark as checked", after, all ? "primary" : "secondary");
+  return s;
+}
+
+// ---------- Released ----------
+function releasedScreen(name) {
+  var done = ORDER, home = listId(ORDER, "");
+  var s = shell("released", name, "Payroll released",
+    "Pay period Oct 1 to 15, 2026, released today at 3:15 PM.", home);
+  var y = s.contentTop;
+  s.rect(CX, y, CW, 52, { fill: C.greenSoft, r: 8, name: "Confirmation message" });
+  s.rect(CX + 20, y + 16, 20, 20, { fill: C.green, r: 10, name: "Success icon" });
+  s.text(CX + 52, y + 16, "48 payslips were sent to employees. All 3 flagged figures were checked before release.",
+    { s: 14, wt: "Medium", c: C.green });
+  y += 68;
+  s.card(CX, y, 740, 60 + 3 * 64 + 8, "Checked before release");
+  done.forEach(function (k, i) {
+    var f = FIG[k], ry = y + 60 + i * 64;
+    if (i) s.hr(CX + 20, ry, 700);
+    s.text(CX + 20, ry + 14, f.label + ", " + f.emp, { s: 14, wt: "Medium" });
+    s.text(CX + 20, ry + 36, f.outcome, { s: 12, c: C.ink3 });
+    s.pill(CX + 740 - 20 - pillW(f.done), ry + 18, f.done, "green");
+  });
+  s.card(CX + 756, y, CW - 756, 164, "Next pay period");
+  s.text(CX + 776, y + 52, "The check runs again when the Oct 16 to 31 draft is ready.", { s: 14, c: C.ink2, w: CW - 796 });
+  s.btn(CX + 776, y + 104, CW - 796, "Back to pre-payroll check", home, "secondary");
+  return s;
+}
+
+// ---------- Build ----------
+function buildSpec(mode) {
+  var want = [];
+  if (mode === "full") {
+    var subsets = [[], ["b"], ["t"], ["l"], ["b", "t"], ["b", "l"], ["t", "l"], ["b", "t", "l"]];
+    subsets.forEach(function (S) {
+      want.push(["list", S, ""]);
+      S.forEach(function (k) { want.push(["list", S, k]); });
+      ORDER.forEach(function (X) { if (S.indexOf(X) < 0) want.push(["trace", X, S]); });
+    });
+  } else {
+    want = [["list", [], ""], ["trace", "b", []], ["list", ["b"], "b"], ["trace", "t", ["b"]], ["list", ["b", "t"], "t"],
+            ["trace", "l", ["b", "t"]], ["list", ["b", "t", "l"], "l"], ["released"], ["list", ["b"], ""], ["list", ["b", "t"], ""],
+            ["list", ["b", "t", "l"], ""]];
+  }
+  if (mode === "full") want.push(["released"]);
+  var ids = {};
+  want.forEach(function (w) { ids[w[0] === "list" ? listId(w[1], w[2]) : w[0] === "trace" ? traceId(w[1], w[2]) : "released"] = 1; });
+  function has(id) { return !!ids[id]; }
+  var n = 0;
+  function nm(t) { n++; return (n < 10 ? "0" : "") + n + " " + t; }
+  return want.map(function (w) {
+    if (w[0] === "list") {
+      var left = 3 - w[1].length;
+      var t = "Check list, " + left + " left" + (w[2] ? ", " + FIG[w[2]].done.toLowerCase() + " message" : (w[1].length ? ", back state" : ""));
+      return listScreen(w[1], w[2], has, nm(t));
+    }
+    if (w[0] === "trace") return traceScreen(w[1], w[2], nm("Trace " + FIG[w[1]].label.toLowerCase()));
+    return releasedScreen(nm("Payroll released"));
+  });
+}
+// Clickable HTML preview built from the same spec.
+(function(){
+  var screens = buildSpec("full"), byId = {};
+  var root = document.getElementById('stage');
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+  function wt(w){return {"Regular":400,"Medium":500,"Semi Bold":600,"Bold":700}[w];}
+  screens.forEach(function(sc){
+    var f = document.createElement('div'); f.className='frame'; f.id='s-'+sc.id;
+    f.style.width=sc.w+'px'; f.style.height=sc.h+'px'; byId[sc.id]=f;
+    sc.els.forEach(function(e){
+      var d=document.createElement(e.k==='btn'?'button':'div'); d.className='el';
+      d.style.left=e.x+'px'; d.style.top=e.y+'px';
+      if(e.k==='rect'){d.style.width=e.w+'px';d.style.height=e.h+'px';
+        if(e.fill)d.style.background=e.fill;
+        if(e.stroke)d.style.boxShadow='inset 0 0 0 1px '+e.stroke;
+        if(e.dash){d.style.boxShadow='none';d.style.border='1px dashed '+e.stroke;}
+        d.style.borderRadius=e.r+'px';}
+      else if(e.k==='text'){d.innerHTML=esc(e.v);d.style.fontSize=e.s+'px';d.style.lineHeight=(e.s*1.4)+'px';
+        d.style.fontWeight=wt(e.wt);d.style.color=e.c;d.style.textAlign=e.align.toLowerCase();
+        if(e.w)d.style.width=e.w+'px'; else d.style.whiteSpace='nowrap';
+        if(e.u)d.style.textDecoration='underline';}
+      else { var b=BTN[e.variant]; d.style.width=e.w+'px';d.style.height=e.h+'px';
+        d.style.background=b.fill||'transparent'; d.style.borderRadius=b.r+'px';
+        d.style.boxShadow=b.stroke?'inset 0 0 0 1px '+b.stroke:(b.bar?'inset 0 -2px 0 '+b.c:'none');
+        d.style.color=b.c; d.style.fontSize=e.s+'px'; d.style.fontWeight=wt(b.wt);
+        var al=e.align||b.align; d.style.textAlign=al.toLowerCase(); d.style.padding=(b.pad||0)?'0 '+b.pad+'px':'0';
+        if(b.u)d.style.textDecoration='underline';
+        d.textContent=e.v; if(e.to){d.dataset.to=e.to;d.classList.add('link');}
+        else {d.disabled=true;}
+      }
+      f.appendChild(d);
+    });
+    root.appendChild(f);
+  });
+  function show(id){Object.keys(byId).forEach(function(k){byId[k].style.display=k===id?'block':'none';});
+    label.textContent=screens.filter(function(x){return x.id===id})[0].name.slice(3);
+    fit(); history.replaceState(null,'','#'+id);}
+  root.addEventListener('click',function(ev){var t=ev.target.closest('[data-to]');if(t)show(t.dataset.to);});
+  var label=document.getElementById('label');
+  document.getElementById('restart').onclick=function(){show('list__');};
+  function fit(){var s=Math.min(1,(window.innerWidth-32)/1440);root.style.transform='scale('+s+')';
+    root.style.height=(1024*s)+'px';}
+  window.addEventListener('resize',fit);
+  window.showScreen=show;
+  var h=(location.hash||'').slice(1); show(byId[h]?h:'list__');
+})();
+</script></body></html>
