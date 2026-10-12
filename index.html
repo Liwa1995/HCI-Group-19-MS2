@@ -24,8 +24,7 @@ button.el:focus-visible{outline:3px solid #6B4FA0;outline-offset:2px}
 #notes li{margin:6px 0;font-size:14px;line-height:1.45}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head><body>
-<div id="bar"><button id="restart" type="button">Restart flow</button><button id="ovw" type="button">Flow overview</button>
-<button id="notesbtn" type="button" aria-pressed="false">Show design notes</button><span id="label" aria-live="polite"></span></div>
+<div id="bar"><button id="restart" type="button">Restart flow</button><span id="label" aria-live="polite"></span></div>
 <div id="wrap"><div id="stage"></div></div><div id="notes" hidden></div>
 <script>
 // MotorPH pre-payroll check, mid-fidelity interactive wireframe, version 2.
@@ -552,7 +551,7 @@ function buildSpec(mode) {
 }
 // Clickable HTML preview: renders each state on demand from the shared spec.
 (function () {
-  var screens = buildSpec("full"), spec = {}, built = {}, stack = [], cur = null, notesOn = false;
+  var screens = buildSpec("full").filter(function (sc) { return sc.id !== "overview"; }), spec = {}, built = {}, stack = [], cur = null, notesOn = false;
   screens.forEach(function (sc) { spec[sc.id] = sc; });
   var root = document.getElementById("stage"), label = document.getElementById("label"), panel = document.getElementById("notes");
   function wt(w) { return { "Regular": 400, "Medium": 500, "Semi Bold": 600, "Bold": 700 }[w]; }
@@ -587,10 +586,6 @@ function buildSpec(mode) {
       }
       f.appendChild(d);
     });
-    sc.notes.forEach(function (n) {
-      var m = el("div", "marker"); m.textContent = n.n; m.style.left = (n.x - 13) + "px"; m.style.top = (n.y - 13) + "px";
-      m.title = n.t; f.appendChild(m);
-    });
     root.appendChild(f); built[sc.id] = f; return f;
   }
   function renderNotes(sc) {
@@ -617,9 +612,6 @@ function buildSpec(mode) {
     if (t.dataset.to === "@back") show(stack.pop() || "list__", false); else show(t.dataset.to, true);
   });
   document.getElementById("restart").onclick = function () { stack = []; show("list__", false); };
-  document.getElementById("ovw").onclick = function () { show("overview", true); };
-  var nb = document.getElementById("notesbtn");
-  nb.onclick = function () { notesOn = !notesOn; nb.setAttribute("aria-pressed", notesOn); nb.textContent = notesOn ? "Hide design notes" : "Show design notes"; show(cur, false); };
   function fit() { var s = Math.min(1, (window.innerWidth - 32) / 1440); root.style.transform = "scale(" + s + ")"; root.style.height = (1024 * s) + "px"; }
   window.addEventListener("resize", fit);
   window.showScreen = function (id) { show(id, false); };
