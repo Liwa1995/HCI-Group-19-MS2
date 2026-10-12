@@ -83,7 +83,7 @@ var FIG = {
   t: { label: "Withholding tax", emp: "R. Dela Cruz", role: "Service Technician", value: "PHP 1,204.10", fixed: "PHP 1,204.10",
     reason: "Withholding is PHP 400 lower than last pay period",
     steps: [
-      { name: "Records", rows: [["Taxable pay in payroll", "PHP 18,000 (2 unpaid days)"], ["Employee's record", "2 unpaid leave days, Oct 8 to 9"]],
+      { name: "Records", rows: [["Taxable pay in payroll", "PHP 18,000 (2 unpaid days)"], ["Employee's record", "2 unpaid leave days, Sep 8 to 9"]],
         src: "Time card and leave log", match: true },
       { name: "Rule", rows: [["Rule applied", "Semi-monthly table, PHP 16,667 to 33,332"], ["Rule expected for PHP 18,000", "Same bracket"]],
         src: "Withholding tax table", match: true },
@@ -92,9 +92,9 @@ var FIG = {
     action: "check", done: "Checked", outcome: "No change needed",
     toast: "Withholding tax for R. Dela Cruz marked as checked. No change was needed." },
   l: { label: "Leave deduction", emp: "M. Lim", role: "Parts Clerk", value: "- PHP 1,000", fixed: "PHP 0",
-    reason: "Oct 6 absence was deducted, but approved leave is on file",
+    reason: "Sep 6 absence was deducted, but approved leave is on file",
     steps: [
-      { name: "Records", rows: [["Time card", "Absent Oct 6, 1 day deducted"], ["Employee's leave record", "Sick leave approved Oct 5"]],
+      { name: "Records", rows: [["Time card", "Absent Sep 6, 1 day deducted"], ["Employee's leave record", "Sick leave approved Sep 5"]],
         src: "Time card and digital leave log", match: false },
       { name: "Rule", rows: [["Rule applied", "Unpaid absence"], ["Rule that should apply", "Paid sick leave, 4 days left"]],
         src: "Leave policy", match: false },
@@ -123,7 +123,7 @@ function shell(id, name, title, sub, homeTo, crumb) {
   ["Payroll runs", "Employee records", "Leave log"].forEach(function (n, i) { s.btn(16, 136 + i * 48, 208, n, null, "nav"); });
   s.hr(16, 296, 208);
   s.text(28, 312, "Payroll cut-off", { s: 12, c: C.ink3 });
-  s.text(28, 330, "Oct 13, 2026, 5:00 PM", { s: 13, wt: "Semi Bold" });
+  s.text(28, 330, "Sep 30, 2026, 5:00 PM", { s: 13, wt: "Semi Bold" });
   var y = 96;
   if (crumb) { s.btn(CX, 92, 260, crumb[0], crumb[1], "link", { h: 28, s: 13 }); y = 128; }
   s.text(CX, y, title, { s: 26, wt: "Semi Bold" });
@@ -136,7 +136,7 @@ function shell(id, name, title, sub, homeTo, crumb) {
 function listScreen(S, last, has, name) {
   var left = ORDER.length - S.length, id = listId(S, last);
   var s = shell(id, name, "Pre-payroll check",
-    "Pay period Oct 1 to 15, 2026. Payslips stay with payroll until every flagged figure is checked.", listId(S, ""));
+    "Pay period Sep 1 to 15, 2026. Payslips stay with payroll until every flagged figure is checked.", listId(S, ""));
 
   if (left > 0) s.btn(W - 32 - 200, 100, 200, "Release payroll", null, "disabled");
   else s.btn(W - 32 - 200, 100, 200, "Release payroll", "released", "primary");
@@ -199,7 +199,7 @@ function traceScreen(X, S, name) {
   var f = FIG[X], id = traceId(X, S), back = listId(S, "");
   var after = listId(S.concat([X]), X);
   var s = shell(id, name, "Trace: " + f.label,
-    f.emp + ", " + f.role + ". Pay period Oct 1 to 15, 2026.", back, ["Back to pre-payroll check", back]);
+    f.emp + ", " + f.role + ". Pay period Sep 1 to 15, 2026.", back, ["Back to pre-payroll check", back]);
   var nMatch = f.steps.filter(function (st) { return st.match; }).length, all = nMatch === 3;
 
   var y = s.contentTop;
@@ -249,7 +249,7 @@ function traceScreen(X, S, name) {
 function releasedScreen(name) {
   var done = ORDER, home = listId(ORDER, "");
   var s = shell("released", name, "Payroll released",
-    "Pay period Oct 1 to 15, 2026, released today at 3:15 PM.", home);
+    "Pay period Sep 1 to 15, 2026, released today at 3:15 PM.", home);
   var y = s.contentTop;
   s.rect(CX, y, CW, 52, { fill: C.greenSoft, r: 8, name: "Confirmation message" });
   s.rect(CX + 20, y + 16, 20, 20, { fill: C.green, r: 10, name: "Success icon" });
@@ -265,7 +265,7 @@ function releasedScreen(name) {
     s.pill(CX + 740 - 20 - pillW(f.done), ry + 18, f.done, "green");
   });
   s.card(CX + 756, y, CW - 756, 164, "Next pay period");
-  s.text(CX + 776, y + 52, "The check runs again when the Oct 16 to 31 draft is ready.", { s: 14, c: C.ink2, w: CW - 796 });
+  s.text(CX + 776, y + 52, "The check runs again when the Sep 16 to 30 draft is ready.", { s: 14, c: C.ink2, w: CW - 796 });
   s.btn(CX + 776, y + 104, CW - 796, "Back to pre-payroll check", home, "secondary");
   return s;
 }
